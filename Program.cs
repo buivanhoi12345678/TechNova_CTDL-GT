@@ -3351,7 +3351,7 @@ public class Ingredient
                         continue;
                     }
 
-                    Console.Write("Số lượng tồn kho: ");
+                    Console.Write("Số lượng tồn kho là: ");
                     if (!decimal.TryParse(Console.ReadLine(), out decimal quantity) || quantity < 0)
                     {
                         EnhancedUI.DisplayError("❌ Số lượng không hợp lệ!");
@@ -11435,6 +11435,7 @@ private void ImportDishesFromFile(string filePath)
 
 
 }
+
 
 
 
