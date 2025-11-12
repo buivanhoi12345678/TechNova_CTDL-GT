@@ -6,9 +6,10 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.VisualBasic.FileIO;
+
 namespace RestaurantManagementSystem
 {
     // ==================== ENUMS ====================
@@ -18,6 +19,7 @@ namespace RestaurantManagementSystem
         Manager,
         Staff
     }
+
     public enum OrderStatus
     {
         Pending,
@@ -25,6 +27,7 @@ namespace RestaurantManagementSystem
         Completed,
         Cancelled
     }
+
     public enum LogLevel
     {
         INFO,
@@ -32,7 +35,54 @@ namespace RestaurantManagementSystem
         ERROR,
         DEBUG
     }
+
+
+
     // ==================== MODELS ====================
+    public class User
+    {
+        public string Username { get; set; }
+        public string PasswordHash { get; set; }
+        public UserRole Role { get; set; }
+        public string FullName { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public bool IsActive { get; set; }
+
+        public User(string username, string passwordHash, UserRole role, string fullName)
+        {
+            Username = username;
+            PasswordHash = passwordHash;
+            Role = role;
+            FullName = fullName;
+            CreatedDate = DateTime.Now;
+            IsActive = true;
+        }
+    }
+
+    public class Ingredient
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Unit { get; set; }
+        public decimal Quantity { get; set; }
+        public decimal MinQuantity { get; set; }
+        public decimal PricePerUnit { get; set; }
+        public DateTime LastUpdated { get; set; }
+
+        public Ingredient(string id, string name, string unit, decimal quantity, decimal minQuantity, decimal pricePerUnit)
+        {
+            Id = id;
+            Name = name;
+            Unit = unit;
+            Quantity = quantity;
+            MinQuantity = minQuantity;
+            PricePerUnit = pricePerUnit;
+            LastUpdated = DateTime.Now;
+        }
+
+        public bool IsLowStock { get { return Quantity <= MinQuantity; } }
+    }
+
     public class Dish
     {
         public string Id { get; set; }
@@ -61,6 +111,7 @@ namespace RestaurantManagementSystem
             SalesCount = 0;
             Cost = 0;
         }
+
         public decimal CalculateCost(Dictionary<string, Ingredient> ingredients)
         {
             if (ingredients == null) throw new ArgumentNullException(nameof(ingredients));
@@ -77,26 +128,8 @@ namespace RestaurantManagementSystem
             return Cost;
         }
     }
-    public class User
-    {
-        public string Username { get; set; }
-        public string PasswordHash { get; set; }
-        public UserRole Role { get; set; }
-        public string FullName { get; set; }
-        public DateTime CreatedDate { get; set; }
-        public bool IsActive { get; set; }
 
-        public User(string username, string passwordHash, UserRole role, string fullName)
-        {
-            Username = username;
-            PasswordHash = passwordHash;
-            Role = role;
-            FullName = fullName;
-            CreatedDate = DateTime.Now;
-            IsActive = true;
-        }
-    }
-     public class Combo
+    public class Combo
     {
         public string Id { get; set; }
         public string Name { get; set; }
@@ -159,7 +192,6 @@ namespace RestaurantManagementSystem
             OriginalPrice = Math.Round(OriginalPrice, 2);
             Logger.Info($"Final combo '{Name}' price: {OriginalPrice:N0}đ", "Combo");
         }
-         
 
         public decimal CalculateCost(Dictionary<string, Dish> dishes)
         {
@@ -180,50 +212,8 @@ namespace RestaurantManagementSystem
     }
 
 
-    public class SystemLog
-    {
-        public string Id { get; set; }
-        public LogLevel Level { get; set; }
-        public string Message { get; set; }
-        public string Module { get; set; }
-        public DateTime Timestamp { get; set; }
-        public string Exception { get; set; }
-        public string StackTrace { get; set; }
 
-        public SystemLog(LogLevel level, string message, string module = "", string exception = "", string stackTrace = "")
-        {
-            Id = Guid.NewGuid().ToString();
-            Level = level;
-            Message = message;
-            Module = module;
-            Timestamp = DateTime.Now;
-            Exception = exception;
-            StackTrace = stackTrace;
-        }
-    }
-public class Ingredient
-    {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string Unit { get; set; }
-        public decimal Quantity { get; set; }
-        public decimal MinQuantity { get; set; }
-        public decimal PricePerUnit { get; set; }
-        public DateTime LastUpdated { get; set; }
 
-        public Ingredient(string id, string name, string unit, decimal quantity, decimal minQuantity, decimal pricePerUnit)
-        {
-            Id = id;
-            Name = name;
-            Unit = unit;
-            Quantity = quantity;
-            MinQuantity = minQuantity;
-            PricePerUnit = pricePerUnit;
-            LastUpdated = DateTime.Now;
-        }
-
-        public bool IsLowStock { get { return Quantity <= MinQuantity; } }
-    }
     public class OrderItem
     {
         public string ItemId { get; set; }
@@ -288,6 +278,29 @@ public class Ingredient
             IpAddress = ipAddress;
         }
     }
+
+    public class SystemLog
+    {
+        public string Id { get; set; }
+        public LogLevel Level { get; set; }
+        public string Message { get; set; }
+        public string Module { get; set; }
+        public DateTime Timestamp { get; set; }
+        public string Exception { get; set; }
+        public string StackTrace { get; set; }
+
+        public SystemLog(LogLevel level, string message, string module = "", string exception = "", string stackTrace = "")
+        {
+            Id = Guid.NewGuid().ToString();
+            Level = level;
+            Message = message;
+            Module = module;
+            Timestamp = DateTime.Now;
+            Exception = exception;
+            StackTrace = stackTrace;
+        }
+    }
+
     // ==================== SERVICES ====================
     public static class SecurityService
     {
@@ -840,6 +853,7 @@ public class Ingredient
                 throw new InvalidOperationException("Không đủ nguyên liệu để thực hiện đơn hàng");
             }
         }
+
         public void Undo()
         {
             // Khôi phục số lượng nguyên liệu
@@ -847,6 +861,7 @@ public class Ingredient
             {
                 system.GetRepository().Ingredients[kvp.Key].Quantity = kvp.Value;
             }
+
             // Khôi phục số lượt bán
             foreach (var item in order.Items)
             {
@@ -865,9 +880,11 @@ public class Ingredient
                     }
                 }
             }
+
             system.GetRepository().Orders.Remove(order.Id);
         }
     }
+
     public class UpdateOrderStatusCommand : ICommand
     {
         private RestaurantSystem system;
@@ -875,6 +892,7 @@ public class Ingredient
         private OrderStatus oldStatus;
         private OrderStatus newStatus;
         public string Description => $"Cập nhật trạng thái đơn hàng {order.Id}: {oldStatus} -> {newStatus}";
+
         public UpdateOrderStatusCommand(RestaurantSystem system, Order order, OrderStatus newStatus)
         {
             this.system = system;
@@ -882,6 +900,7 @@ public class Ingredient
             this.oldStatus = order.Status;
             this.newStatus = newStatus;
         }
+
         public void Execute()
         {
             order.Status = newStatus;
@@ -1028,10 +1047,12 @@ public class Ingredient
         public void OptimizeLargeDatasets()
         {
             Logger.Info("Optimizing large datasets", "MemoryManager");
+
             try
             {
                 var repo = system.GetRepository();
-                // Tối ưu dictionary bằng việc set cap
+
+                // Tối ưu hóa dictionaries bằng cách set capacity chính xác
                 if (repo.Dishes.Count > 1000)
                 {
                     var newDishes = new Dictionary<string, Dish>(repo.Dishes.Count);
@@ -1040,6 +1061,7 @@ public class Ingredient
                     repo.Dishes = newDishes;
                     Logger.Info($"Optimized dishes dictionary: {repo.Dishes.Count} items", "MemoryManager");
                 }
+
                 if (repo.Ingredients.Count > 1000)
                 {
                     var newIngredients = new Dictionary<string, Ingredient>(repo.Ingredients.Count);
@@ -1689,7 +1711,7 @@ public class Ingredient
             }
             Console.WriteLine("╚════════════════════════════════════════════════════════════════╝");
 
-            Console.Write("Chọn chức năng(0 để thoát) : ");
+            Console.Write("Chọn chức năng: ");
             string input = Console.ReadLine();
 
             if (int.TryParse(input, out int choice) && choice >= 0 && choice <= options.Count)
@@ -3348,7 +3370,7 @@ public class Ingredient
                         continue;
                     }
 
-                    Console.Write("Số lượng tồn kho là: ");
+                    Console.Write("Số lượng tồn kho: ");
                     if (!decimal.TryParse(Console.ReadLine(), out decimal quantity) || quantity < 0)
                     {
                         EnhancedUI.DisplayError("❌ Số lượng không hợp lệ!");
@@ -3655,7 +3677,6 @@ public class Ingredient
                 "Xem lịch sử Redo",
                 "Xóa lịch sử",
                 "Thống kê hoạt động"
-                
             };
 
             while (true)
@@ -11432,29 +11453,3 @@ private void ImportDishesFromFile(string filePath)
 
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
