@@ -5478,7 +5478,7 @@ namespace RestaurantManagementSystem
                     continue;
                 }
 
-                // tách input thành các mã món, an toàn với phiên bản .NET/C# cũ
+                // tách input thành các mã món, an toàn với phiên bản .NET/C# cũ : 1002,1000 tach 2 mã rieng : 1000 , 1002
                 var dishIds = input.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                                    .Select(x => x.Trim())
                                    .Where(x => !string.IsNullOrEmpty(x))
@@ -5678,7 +5678,7 @@ namespace RestaurantManagementSystem
                 Console.WriteLine("4. Món còn nguyên liệu");
                 Console.WriteLine("5. Món hết nguyên liệu");
                 Console.WriteLine("6. Món bán chạy nhất");
-                Console.WriteLine("7. Món lợi nhuận cao");
+                Console.WriteLine("7. Món lợi nhuận cao nhất");
                 Console.WriteLine("0. Thoát");
                 Console.Write("\nChọn tiêu chí lọc: ");
 
@@ -8907,7 +8907,7 @@ private void ImportDishesFromFile(string filePath)
                 Console.ReadKey();
                 return;
             }
-
+             
             var random = new Random();
             var selectedDishes = availableDishes.OrderBy(x => random.Next()).Take(3).ToList();
 
@@ -9108,204 +9108,169 @@ private void ImportDishesFromFile(string filePath)
             Console.ReadKey();
         }
 
+        private List<Combo> GenerateCombosFromCandidates(
+     List<Dish> dishes, int minItems, int maxItems, string partyType)
+        {
+            List<Combo> result = new List<Combo>();
+            List<string> current = new List<string>();  // Chứa ID món ăn
+
+            void Backtrack(int start)
+            {
+                // Nếu đã chọn đủ món hợp lệ → tạo combo
+                if (current.Count >= minItems && current.Count <= maxItems)
+                {
+                    Combo combo = new Combo(
+                        Guid.NewGuid().ToString(),
+                        $"{partyType} Combo ({current.Count} món)",
+                        $"Combo tự động chọn {current.Count} món cho {partyType}",
+                        10
+                    );
+
+                    combo.DishIds = new List<string>(current);
+                    result.Add(combo);
+                }
+
+                if (current.Count == maxItems)
+                    return;
+
+                for (int i = start; i < dishes.Count; i++)
+                {
+                    current.Add(dishes[i].Id);
+                    Backtrack(i + 1);
+                    current.RemoveAt(current.Count - 1);
+                }
+            }
+
+            Backtrack(0);
+            return result;
+        }
+
 
         private void GeneratePartyMenuCombos()
         {
-            EnhancedUI.DisplayHeader("COMBO THỰC ĐƠN TIỆC");
+            EnhancedUI.DisplayHeader("COMBO THỰC ĐƠN TỰ ĐỘNG (ĐỆ QUY TỔ HỢP)");
 
             Console.WriteLine("Chọn loại tiệc:");
-            Console.WriteLine("1. Tiệc cưới");
-            Console.WriteLine("2. Tiệc sinh nhật");
-            Console.WriteLine("3. Tiệc công ty");
-            Console.WriteLine("4. Tiệc gia đình");
+            Console.WriteLine("1. Tiệc cưới (5 món)");
+            Console.WriteLine("2. Sinh nhật (3–4 món)");
+            Console.WriteLine("3. Công ty (4 món)");
+            Console.WriteLine("4. Gia đình (2–3 món)");
             Console.Write("Chọn: ");
 
             string choice = Console.ReadLine();
-            List<Combo> suggestedCombos = new List<Combo>();
             string partyType = "";
+            int minItems = 0, maxItems = 0;
 
             switch (choice)
             {
-                case "1":
-                    partyType = "Tiệc cưới";
-                    suggestedCombos = GenerateWeddingCombos();
-                    break;
-                case "2":
-                    partyType = "Tiệc sinh nhật";
-                    suggestedCombos = GenerateBirthdayCombos();
-                    break;
-                case "3":
-                    partyType = "Tiệc công ty";
-                    suggestedCombos = GenerateCorporateCombos();
-                    break;
-                case "4":
-                    partyType = "Tiệc gia đình";
-                    suggestedCombos = GenerateFamilyCombos();
-                    break;
+                case "1": partyType = "Tiệc cưới"; minItems = maxItems = 5; break;
+                case "2": partyType = "Sinh nhật"; minItems = 3; maxItems = 4; break;
+                case "3": partyType = "Tiệc công ty"; minItems = maxItems = 4; break;
+                case "4": partyType = "Gia đình"; minItems = 2; maxItems = 3; break;
                 default:
                     EnhancedUI.DisplayError("Lựa chọn không hợp lệ!");
                     return;
             }
 
-            if (suggestedCombos.Any())
+            // Lấy toàn bộ món có thể dùng
+            List<Dish> candidateDishes = repository.Dishes.Values
+                .Where(d => d.IsAvailable && CheckDishIngredients(d))
+                .ToList();
+
+            var combos = GenerateCombosFromCandidates(
+                candidateDishes, minItems, maxItems, partyType);
+
+            if (!combos.Any())
             {
-                Console.WriteLine($"\n🎉 COMBO GỢI Ý CHO {partyType.ToUpper()}:");
-                foreach (var combo in suggestedCombos)
-                {
-                    combo.CalculateOriginalPrice(repository.Dishes);
-                    combo.CalculateCost(repository.Dishes);
-
-                    Console.WriteLine($"\n{combo.Name}:");
-                    Console.WriteLine($"- Giá gốc: {combo.OriginalPrice:N0}đ");
-                    Console.WriteLine($"- Giá KM: {combo.FinalPrice:N0}đ");
-                    Console.WriteLine($"- Giảm giá: {combo.DiscountPercent}%");
-                    Console.WriteLine($"- Số món: {combo.DishIds.Count}");
-                    Console.WriteLine($"- Lợi nhuận: {combo.ProfitMargin:F1}%");
-
-                    Console.WriteLine("  Món bao gồm:");
-                    foreach (var dishId in combo.DishIds)
-                    {
-                        if (repository.Dishes.ContainsKey(dishId))
-                        {
-                            var dish = repository.Dishes[dishId];
-                            Console.WriteLine($"  + {dish.Name} - {dish.Price:N0}đ");
-                        }
-                    }
-                }
-
-                // Xuất file gợi ý
-                if (EnhancedUI.Confirm("Xuất danh sách combo ra file?"))
-                {
-                    ExportPartyMenuCombos(suggestedCombos, partyType);
-                }
-
-                // Tạo combo trong hệ thống
-                if (EnhancedUI.Confirm("Tạo các combo này trong hệ thống?"))
-                {
-                    foreach (var combo in suggestedCombos)
-                    {
-                        repository.Combos[combo.Id] = combo;
-                    }
-                    SaveAllData();
-                    EnhancedUI.DisplaySuccess("Đã tạo combo trong hệ thống!");
-                }
+                EnhancedUI.DisplayError("Không sinh được combo!");
+                return;
             }
-            else
+
+            Console.WriteLine($"\n🎉 {combos.Count} COMBO ĐƯỢC TẠO CHO {partyType}:");
+
+            foreach (var combo in combos)
             {
-                EnhancedUI.DisplayError("Không thể tạo combo cho loại tiệc này!");
+                combo.CalculateOriginalPrice(repository.Dishes);
+                combo.CalculateCost(repository.Dishes);
+
+                Console.WriteLine($"\n{combo.Name} ({combo.DishIds.Count} món)");
+                Console.WriteLine($"- Giá gốc: {combo.OriginalPrice:N0}đ");
+                Console.WriteLine($"- KM: {combo.FinalPrice:N0}đ");
+
+                Console.WriteLine("  Món gồm:");
+                foreach (var id in combo.DishIds)
+                    Console.WriteLine($"  + {repository.Dishes[id].Name}");
+            }
+
+            if (EnhancedUI.Confirm("\nXuất ra file?"))
+                ExportPartyMenuCombos(combos, partyType);
+
+            if (EnhancedUI.Confirm("Lưu vào hệ thống?"))
+            {
+                foreach (var c in combos)
+                    repository.Combos[c.Id] = c;
+
+                SaveAllData();
+                EnhancedUI.DisplaySuccess("Đã thêm combo!");
             }
 
             Console.WriteLine("\nNhấn phím bất kỳ để tiếp tục...");
             Console.ReadKey();
         }
 
+
         private List<Combo> GenerateWeddingCombos()
         {
-            var combos = new List<Combo>();
-
-            // Combo cao cấp
-            var premiumCombo = new Combo("WEDDING_PREMIUM", "Combo Cưới Cao Cấp", "Combo cao cấp cho tiệc cưới", 15);
-            var premiumDishes = repository.Dishes.Values
-                .Where(d => d.Price > 100000 && d.Category != "Đồ uống" && d.IsAvailable && CheckDishIngredients(d))
-                .Take(4)
+            var candidateDishes = repository.Dishes.Values
+                .Where(d => d.Price > 50000 &&
+                            d.Category != "Đồ uống" &&
+                            d.IsAvailable &&
+                            CheckDishIngredients(d))
                 .ToList();
 
-            if (premiumDishes.Count >= 3)
-            {
-                foreach (var dish in premiumDishes)
-                {
-                    premiumCombo.DishIds.Add(dish.Id);
-                }
-                combos.Add(premiumCombo);
-            }
-
-            // Combo tiêu chuẩn
-            var standardCombo = new Combo("WEDDING_STANDARD", "Combo Cưới Tiêu Chuẩn", "Combo tiêu chuẩn cho tiệc cưới", 10);
-            var standardDishes = repository.Dishes.Values
-                .Where(d => d.Price >= 50000 && d.Price <= 100000 && d.IsAvailable && CheckDishIngredients(d))
-                .Take(3)
-                .ToList();
-
-            if (standardDishes.Count >= 2)
-            {
-                foreach (var dish in standardDishes)
-                {
-                    standardCombo.DishIds.Add(dish.Id);
-                }
-                combos.Add(standardCombo);
-            }
-
-            return combos;
+            return GenerateCombosFromCandidates(candidateDishes, 3, 5, "Tiệc cưới");
         }
+
 
         private List<Combo> GenerateBirthdayCombos()
         {
-            var combos = new List<Combo>();
-
-            // Combo gia đình
-            var familyCombo = new Combo("BIRTHDAY_FAMILY", "Combo Sinh Nhật Gia Đình", "Combo ấm cúng cho gia đình", 12);
-            var familyDishes = repository.Dishes.Values
-                .Where(d => (d.Category == "Món chính" || d.Category == "Món phụ") && d.IsAvailable && CheckDishIngredients(d))
-                .Take(3)
+            var candidateDishes = repository.Dishes.Values
+                .Where(d =>
+                    (d.Category == "Món chính" || d.Category == "Món phụ") &&
+                     d.IsAvailable &&
+                     CheckDishIngredients(d))
                 .ToList();
 
-            if (familyDishes.Count >= 2)
-            {
-                foreach (var dish in familyDishes)
-                {
-                    familyCombo.DishIds.Add(dish.Id);
-                }
-                combos.Add(familyCombo);
-            }
-
-            return combos;
+            return GenerateCombosFromCandidates(candidateDishes, 2, 4, "Sinh nhật");
         }
+
 
         private List<Combo> GenerateCorporateCombos()
         {
-            var combos = new List<Combo>();
-
-            // Combo hội nghị
-            var conferenceCombo = new Combo("CORP_CONFERENCE", "Combo Hội Nghị", "Combo chuyên nghiệp cho hội nghị", 8);
-            var conferenceDishes = repository.Dishes.Values
-                .Where(d => (d.Category == "Món khai vị" || d.Category == "Đồ uống") && d.IsAvailable && CheckDishIngredients(d))
-                .Take(4)
+            var candidateDishes = repository.Dishes.Values
+                .Where(d =>
+                    (d.Category == "Món khai vị" || d.Category == "Đồ uống") &&
+                     d.IsAvailable &&
+                     CheckDishIngredients(d))
                 .ToList();
 
-            if (conferenceDishes.Count >= 3)
-            {
-                foreach (var dish in conferenceDishes)
-                {
-                    conferenceCombo.DishIds.Add(dish.Id);
-                }
-                combos.Add(conferenceCombo);
-            }
-
-            return combos;
+            return GenerateCombosFromCandidates(candidateDishes, 3, 5, "Tiệc công ty");
         }
+
 
         private List<Combo> GenerateFamilyCombos()
         {
-            var combos = new List<Combo>();
-
-            // Combo ấm cúng
-            var cozyCombo = new Combo("FAMILY_COZY", "Combo Gia Đình Ấm Cúng", "Combo ấm cúng cho bữa cơm gia đình", 5);
-            var cozyDishes = repository.Dishes.Values
-                .Where(d => (d.Category == "Món chính" || d.Category == "Món phụ") && d.IsAvailable && CheckDishIngredients(d))
-                .Take(3)
+            var candidateDishes = repository.Dishes.Values
+                .Where(d =>
+                    (d.Category == "Món chính" || d.Category == "Món phụ") &&
+                     d.IsAvailable &&
+                     CheckDishIngredients(d))
                 .ToList();
 
-            if (cozyDishes.Count >= 2)
-            {
-                foreach (var dish in cozyDishes)
-                {
-                    cozyCombo.DishIds.Add(dish.Id);
-                }
-                combos.Add(cozyCombo);
-            }
-
-            return combos;
+            return GenerateCombosFromCandidates(candidateDishes, 2, 4, "Gia đình");
         }
+
+
 
         private void ExportPartyMenuCombos(List<Combo> combos, string partyType)
         {
@@ -11453,5 +11418,3 @@ private void ImportDishesFromFile(string filePath)
 
 
 }
-
-
