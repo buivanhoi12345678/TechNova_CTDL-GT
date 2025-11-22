@@ -3042,253 +3042,253 @@ namespace RestaurantManagementSystem
             }
         }
 
-       private void CalculateDishCosts()
-{
-    EnhancedUI.DisplayHeader("📊 PHÂN TÍCH CHI PHÍ & LỢI NHUẬN MÓN ĂN");
-
-    if (repository.Dishes.Count == 0)
-    {
-        EnhancedUI.DisplayWarning("Không có món ăn nào trong hệ thống!");
-        Console.ReadKey();
-        return;
-    }
-
-    // Tính chi phí cho tất cả món (đảm bảo cập nhật dish.Cost & dish.ProfitMargin nếu có)
-    foreach (var d in repository.Dishes.Values)
-    {
-        try
+        private void CalculateDishCosts()
         {
-            d.CalculateCost(repository.Ingredients);
-        }
-        catch
-        {
-            // Bỏ qua nếu có lỗi tính chi phí cho món (vẫn sẽ báo là chưa có NL)
-        }
-    }
+            EnhancedUI.DisplayHeader("📊 PHÂN TÍCH CHI PHÍ & LỢI NHUẬN MÓN ĂN");
 
-    // Lọc: chỉ hiển thị các món đã được gán nguyên liệu (có ít nhất 1 nguyên liệu)
-    var dishesWithIngredients = repository.Dishes.Values
-        .Where(x => x.Ingredients != null && x.Ingredients.Any())
-        .ToList();
-
-    var dishesWithoutIngredients = repository.Dishes.Values
-        .Where(x => x.Ingredients == null || !x.Ingredients.Any())
-        .ToList();
-
-    int updatedCount = dishesWithIngredients.Count;
-    int noIngredientCount = dishesWithoutIngredients.Count;
-
-    // Hiển thị bảng chỉ các món đã có nguyên liệu
-    Console.WriteLine();
-    Console.WriteLine("╔══════════════════════════════════════════════════════════════════════════════════╗");
-    Console.WriteLine("║ {0,-10} | {1,-30} | {2,12} | {3,12} | {4,8} ║", "Mã", "Tên Món", "Giá Bán", "Chi Phí", "LN (%)");
-    Console.WriteLine("╠══════════════════════════════════════════════════════════════════════════════════╣");
-
-    foreach (var dish in dishesWithIngredients)
-    {
-        // Hiển thị an toàn: nếu Cost = 0 thì hiển "N/A"
-        string costDisplay = dish.Cost > 0m ? dish.Cost.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) : "N/A";
-        string marginDisplay = dish.Cost > 0m ? $"{dish.ProfitMargin:F1}%" : "N/A";
-
-        Console.WriteLine("║ {0,-10} | {1,-30} | {2,12:N0} | {3,12} | {4,7} ║",
-            dish.Id,
-            TruncateString(dish.Name, 30),
-            dish.Price,
-            costDisplay,
-            marginDisplay);
-    }
-
-    Console.WriteLine("╚══════════════════════════════════════════════════════════════════════════════════╝");
-
-    EnhancedUI.DisplaySuccess($"✅ Hiển thị {updatedCount} món đã có nguyên liệu.");
-    if (noIngredientCount > 0)
-        EnhancedUI.DisplayWarning($"⚠️ Có {noIngredientCount} món chưa được gán nguyên liệu.");
-
-    // Thống kê tổng
-    decimal totalCost = dishesWithIngredients.Sum(d => d.Cost);
-    decimal totalProfit = dishesWithIngredients.Sum(d => (d.Price - d.Cost));
-    decimal avgProfitMargin = dishesWithIngredients.Any() ? dishesWithIngredients.Average(d => d.Cost > 0 ? d.ProfitMargin : 0m) : 0m;
-
-    Console.WriteLine($"\n💰 Tổng chi phí (các món có NL): {totalCost:N0}đ");
-    Console.WriteLine($"📈 Tổng lợi nhuận (các món có NL): {totalProfit:N0}đ");
-    Console.WriteLine($"📊 Tỷ suất lợi nhuận trung bình: {avgProfitMargin:F1}%");
-
-    // Top lists (chỉ tính những món có Cost > 0)
-    var withValidCost = dishesWithIngredients.Where(d => d.Cost > 0m).ToList();
-    var topHigh = withValidCost.OrderByDescending(d => d.ProfitMargin).Take(5).ToList();
-    var topLow = withValidCost.OrderBy(d => d.ProfitMargin).Take(5).ToList();
-
-    Console.WriteLine("\n🏆 TOP 5 MÓN LỢI NHUẬN CAO:");
-    if (topHigh.Any())
-    {
-        foreach (var t in topHigh)
-            Console.WriteLine($"- {t.Name}: {t.ProfitMargin:F1}% (Giá: {t.Price:N0}đ, CP: {t.Cost:N0}đ)");
-    }
-    else Console.WriteLine("- Không có món đủ dữ liệu.");
-
-    Console.WriteLine("\n⚠️ TOP 5 MÓN LỢI NHUẬN THẤP:");
-    if (topLow.Any())
-    {
-        foreach (var b in topLow)
-        {
-            string suggestion = b.ProfitMargin < 10 ? "👉 Nên tăng giá/ tối ưu NL" : "✔️ Ổn định";
-            Console.WriteLine($"- {b.Name}: {b.ProfitMargin:F1}% (Giá: {b.Price:N0}đ, CP: {b.Cost:N0}đ) {suggestion}");
-        }
-    }
-    else Console.WriteLine("- Không có món đủ dữ liệu.");
-
-    // Gợi ý xuất file
-    Console.WriteLine("\nBạn có muốn xuất file không? Chọn:");
-    Console.WriteLine("1 - Xuất file CHI TIẾT các món (Id,Name,Description,Price,Category)");
-    Console.WriteLine("2 - Xuất file TỔNG HỢP (summary + top lists)");
-    Console.WriteLine("3 - Xuất cả 2");
-    Console.WriteLine("0 - Không xuất");
-    Console.Write("\nLựa chọn của bạn: ");
-    string opt = Console.ReadLine()?.Trim();
-
-    int option;
-    if (!int.TryParse(opt, out option)) option = 0;
-
-    // helper: chuẩn bị thư mục Downloads
-    string downloadsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-    try
-    {
-        if (!Directory.Exists(downloadsPath))
-            Directory.CreateDirectory(downloadsPath);
-    }
-    catch
-    {
-        // fallback: dùng current directory
-        downloadsPath = Environment.CurrentDirectory;
-    }
-
-    // helper để escape CSV field an toàn
-    Func<string, string> EscapeCsv = (s) =>
-    {
-        if (s == null) return "\"\"";
-        string v = s.Replace("\"", "\"\"");
-        return $"\"{v}\"";
-    };
-
-    // Hàm ghi file chi tiết (danh sách các món: Id,Name,Description,Price,Category)
-    Action<string, IEnumerable<Dish>> WriteDetailCsv = (filePath, list) =>
-    {
-        using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
-        using (var bw = new StreamWriter(fs, new System.Text.UTF8Encoding(true))) // UTF8 BOM
-        {
-            bw.WriteLine("Id,Name,Description,Price,Category");
-            foreach (var d in list)
+            if (repository.Dishes.Count == 0)
             {
-                // ghi số theo InvariantCulture để tránh dấu phân nghìn
-                string price = d.Price.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                bw.WriteLine(string.Join(",", new string[]
+                EnhancedUI.DisplayWarning("Không có món ăn nào trong hệ thống!");
+                Console.ReadKey();
+                return;
+            }
+
+            // Tính chi phí cho tất cả món (đảm bảo cập nhật dish.Cost & dish.ProfitMargin nếu có)
+            foreach (var d in repository.Dishes.Values)
+            {
+                try
                 {
+                    d.CalculateCost(repository.Ingredients);
+                }
+                catch
+                {
+                    // Bỏ qua nếu có lỗi tính chi phí cho món (vẫn sẽ báo là chưa có NL)
+                }
+            }
+
+            // Lọc: chỉ hiển thị các món đã được gán nguyên liệu (có ít nhất 1 nguyên liệu)
+            var dishesWithIngredients = repository.Dishes.Values
+                .Where(x => x.Ingredients != null && x.Ingredients.Any())
+                .ToList();
+
+            var dishesWithoutIngredients = repository.Dishes.Values
+                .Where(x => x.Ingredients == null || !x.Ingredients.Any())
+                .ToList();
+
+            int updatedCount = dishesWithIngredients.Count;
+            int noIngredientCount = dishesWithoutIngredients.Count;
+
+            // Hiển thị bảng chỉ các món đã có nguyên liệu
+            Console.WriteLine();
+            Console.WriteLine("╔══════════════════════════════════════════════════════════════════════════════════╗");
+            Console.WriteLine("║ {0,-10} | {1,-30} | {2,12} | {3,12} | {4,8} ║", "Mã", "Tên Món", "Giá Bán", "Chi Phí", "LN (%)");
+            Console.WriteLine("╠══════════════════════════════════════════════════════════════════════════════════╣");
+
+            foreach (var dish in dishesWithIngredients)
+            {
+                // Hiển thị an toàn: nếu Cost = 0 thì hiển "N/A"
+                string costDisplay = dish.Cost > 0m ? dish.Cost.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) : "N/A";
+                string marginDisplay = dish.Cost > 0m ? $"{dish.ProfitMargin:F1}%" : "N/A";
+
+                Console.WriteLine("║ {0,-10} | {1,-30} | {2,12:N0} | {3,12} | {4,7} ║",
+                    dish.Id,
+                    TruncateString(dish.Name, 30),
+                    dish.Price,
+                    costDisplay,
+                    marginDisplay);
+            }
+
+            Console.WriteLine("╚══════════════════════════════════════════════════════════════════════════════════╝");
+
+            EnhancedUI.DisplaySuccess($"✅ Hiển thị {updatedCount} món đã có nguyên liệu.");
+            if (noIngredientCount > 0)
+                EnhancedUI.DisplayWarning($"⚠️ Có {noIngredientCount} món chưa được gán nguyên liệu.");
+
+            // Thống kê tổng
+            decimal totalCost = dishesWithIngredients.Sum(d => d.Cost);
+            decimal totalProfit = dishesWithIngredients.Sum(d => (d.Price - d.Cost));
+            decimal avgProfitMargin = dishesWithIngredients.Any() ? dishesWithIngredients.Average(d => d.Cost > 0 ? d.ProfitMargin : 0m) : 0m;
+
+            Console.WriteLine($"\n💰 Tổng chi phí (các món có NL): {totalCost:N0}đ");
+            Console.WriteLine($"📈 Tổng lợi nhuận (các món có NL): {totalProfit:N0}đ");
+            Console.WriteLine($"📊 Tỷ suất lợi nhuận trung bình: {avgProfitMargin:F1}%");
+
+            // Top lists (chỉ tính những món có Cost > 0)
+            var withValidCost = dishesWithIngredients.Where(d => d.Cost > 0m).ToList();
+            var topHigh = withValidCost.OrderByDescending(d => d.ProfitMargin).Take(5).ToList();
+            var topLow = withValidCost.OrderBy(d => d.ProfitMargin).Take(5).ToList();
+
+            Console.WriteLine("\n🏆 TOP 5 MÓN LỢI NHUẬN CAO:");
+            if (topHigh.Any())
+            {
+                foreach (var t in topHigh)
+                    Console.WriteLine($"- {t.Name}: {t.ProfitMargin:F1}% (Giá: {t.Price:N0}đ, CP: {t.Cost:N0}đ)");
+            }
+            else Console.WriteLine("- Không có món đủ dữ liệu.");
+
+            Console.WriteLine("\n⚠️ TOP 5 MÓN LỢI NHUẬN THẤP:");
+            if (topLow.Any())
+            {
+                foreach (var b in topLow)
+                {
+                    string suggestion = b.ProfitMargin < 10 ? "👉 Nên tăng giá/ tối ưu NL" : "✔️ Ổn định";
+                    Console.WriteLine($"- {b.Name}: {b.ProfitMargin:F1}% (Giá: {b.Price:N0}đ, CP: {b.Cost:N0}đ) {suggestion}");
+                }
+            }
+            else Console.WriteLine("- Không có món đủ dữ liệu.");
+
+            // Gợi ý xuất file
+            Console.WriteLine("\nBạn có muốn xuất file không? Chọn:");
+            Console.WriteLine("1 - Xuất file CHI TIẾT các món (Id,Name,Description,Price,Category)");
+            Console.WriteLine("2 - Xuất file TỔNG HỢP (summary + top lists)");
+            Console.WriteLine("3 - Xuất cả 2");
+            Console.WriteLine("0 - Không xuất");
+            Console.Write("\nLựa chọn của bạn: ");
+            string opt = Console.ReadLine()?.Trim();
+
+            int option;
+            if (!int.TryParse(opt, out option)) option = 0;
+
+            // helper: chuẩn bị thư mục Downloads
+            string downloadsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+            try
+            {
+                if (!Directory.Exists(downloadsPath))
+                    Directory.CreateDirectory(downloadsPath);
+            }
+            catch
+            {
+                // fallback: dùng current directory
+                downloadsPath = Environment.CurrentDirectory;
+            }
+
+            // helper để escape CSV field an toàn
+            Func<string, string> EscapeCsv = (s) =>
+            {
+                if (s == null) return "\"\"";
+                string v = s.Replace("\"", "\"\"");
+                return $"\"{v}\"";
+            };
+
+            // Hàm ghi file chi tiết (danh sách các món: Id,Name,Description,Price,Category)
+            Action<string, IEnumerable<Dish>> WriteDetailCsv = (filePath, list) =>
+            {
+                using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                using (var bw = new StreamWriter(fs, new System.Text.UTF8Encoding(true))) // UTF8 BOM
+                {
+                    bw.WriteLine("Id,Name,Description,Price,Category");
+                    foreach (var d in list)
+                    {
+                        // ghi số theo InvariantCulture để tránh dấu phân nghìn
+                        string price = d.Price.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        bw.WriteLine(string.Join(",", new string[]
+                        {
                     EscapeCsv(d.Id),
                     EscapeCsv(d.Name),
                     EscapeCsv(d.Description),
                     EscapeCsv(price),
                     EscapeCsv(d.Category)
-                }));
-            }
-        }
-    };
+                        }));
+                    }
+                }
+            };
 
-    // Hàm ghi file summary (tổng hợp)
-    Action<string> WriteSummaryCsv = (filePath) =>
-    {
-        using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
-        using (var bw = new StreamWriter(fs, new System.Text.UTF8Encoding(true)))
-        {
-            bw.WriteLine("Metric,Value");
-            bw.WriteLine($"TotalDishes,{repository.Dishes.Count}");
-            bw.WriteLine($"DishesWithIngredients,{dishesWithIngredients.Count}");
-            bw.WriteLine($"DishesWithoutIngredients,{dishesWithoutIngredients.Count}");
-            bw.WriteLine($"TotalCost,{totalCost.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
-            bw.WriteLine($"TotalProfit,{totalProfit.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
-            bw.WriteLine($"AvgProfitMargin,{avgProfitMargin.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
-            bw.WriteLine();
-
-            bw.WriteLine("TOP5_HighProfit,ProfitMargin");
-            foreach (var t in topHigh)
-                bw.WriteLine($"{EscapeCsv(t.Name)},{t.ProfitMargin.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
-
-            bw.WriteLine();
-            bw.WriteLine("TOP5_LowProfit,ProfitMargin");
-            foreach (var b in topLow)
-                bw.WriteLine($"{EscapeCsv(b.Name)},{b.ProfitMargin.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
-        }
-    };
-
-    // File danh sách món chưa có nguyên liệu (luôn xuất nếu user chọn xuất bất kỳ file nào)
-    Action<string> WriteNoIngredientCsv = (filePath) =>
-    {
-        using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
-        using (var bw = new StreamWriter(fs, new System.Text.UTF8Encoding(true)))
-        {
-            bw.WriteLine("Id,Name,Description,Price,Category");
-            foreach (var d in dishesWithoutIngredients)
+            // Hàm ghi file summary (tổng hợp)
+            Action<string> WriteSummaryCsv = (filePath) =>
             {
-                string price = d.Price.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                bw.WriteLine(string.Join(",", new string[]
+                using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                using (var bw = new StreamWriter(fs, new System.Text.UTF8Encoding(true)))
                 {
+                    bw.WriteLine("Metric,Value");
+                    bw.WriteLine($"TotalDishes,{repository.Dishes.Count}");
+                    bw.WriteLine($"DishesWithIngredients,{dishesWithIngredients.Count}");
+                    bw.WriteLine($"DishesWithoutIngredients,{dishesWithoutIngredients.Count}");
+                    bw.WriteLine($"TotalCost,{totalCost.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+                    bw.WriteLine($"TotalProfit,{totalProfit.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+                    bw.WriteLine($"AvgProfitMargin,{avgProfitMargin.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+                    bw.WriteLine();
+
+                    bw.WriteLine("TOP5_HighProfit,ProfitMargin");
+                    foreach (var t in topHigh)
+                        bw.WriteLine($"{EscapeCsv(t.Name)},{t.ProfitMargin.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+
+                    bw.WriteLine();
+                    bw.WriteLine("TOP5_LowProfit,ProfitMargin");
+                    foreach (var b in topLow)
+                        bw.WriteLine($"{EscapeCsv(b.Name)},{b.ProfitMargin.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+                }
+            };
+
+            // File danh sách món chưa có nguyên liệu (luôn xuất nếu user chọn xuất bất kỳ file nào)
+            Action<string> WriteNoIngredientCsv = (filePath) =>
+            {
+                using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                using (var bw = new StreamWriter(fs, new System.Text.UTF8Encoding(true)))
+                {
+                    bw.WriteLine("Id,Name,Description,Price,Category");
+                    foreach (var d in dishesWithoutIngredients)
+                    {
+                        string price = d.Price.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        bw.WriteLine(string.Join(",", new string[]
+                        {
                     EscapeCsv(d.Id),
                     EscapeCsv(d.Name),
                     EscapeCsv(d.Description),
                     EscapeCsv(price),
                     EscapeCsv(d.Category)
-                }));
-            }
-        }
-    };
+                        }));
+                    }
+                }
+            };
 
-    // Thực thi xuất theo lựa chọn
-    try
-    {
-        if (option == 1 || option == 3)
-        {
-            string detailPath = Path.Combine(downloadsPath, $"DishDetails_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-            WriteDetailCsv(detailPath, dishesWithIngredients);
-            EnhancedUI.DisplaySuccess($"✅ Đã xuất file chi tiết các món có nguyên liệu: {detailPath}");
-
-            // xuất file danh sách chưa có nguyên liệu
-            if (dishesWithoutIngredients.Any())
+            // Thực thi xuất theo lựa chọn
+            try
             {
-                string noIngPath = Path.Combine(downloadsPath, $"Dishes_NoIngredients_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-                WriteNoIngredientCsv(noIngPath);
-                EnhancedUI.DisplaySuccess($"✅ Đã xuất file các món CHƯA có nguyên liệu: {noIngPath}");
+                if (option == 1 || option == 3)
+                {
+                    string detailPath = Path.Combine(downloadsPath, $"DishDetails_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                    WriteDetailCsv(detailPath, dishesWithIngredients);
+                    EnhancedUI.DisplaySuccess($"✅ Đã xuất file chi tiết các món có nguyên liệu: {detailPath}");
+
+                    // xuất file danh sách chưa có nguyên liệu
+                    if (dishesWithoutIngredients.Any())
+                    {
+                        string noIngPath = Path.Combine(downloadsPath, $"Dishes_NoIngredients_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                        WriteNoIngredientCsv(noIngPath);
+                        EnhancedUI.DisplaySuccess($"✅ Đã xuất file các món CHƯA có nguyên liệu: {noIngPath}");
+                    }
+                }
+
+                if (option == 2 || option == 3)
+                {
+                    string summaryPath = Path.Combine(downloadsPath, $"DishSummary_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                    WriteSummaryCsv(summaryPath);
+                    EnhancedUI.DisplaySuccess($"✅ Đã xuất file tổng hợp: {summaryPath}");
+                }
+
+                if (option == 0)
+                {
+                    Console.WriteLine("Không xuất file.");
+                }
             }
+            catch (Exception ex)
+            {
+                EnhancedUI.DisplayError("❌ Lỗi khi xuất file: " + ex.Message);
+            }
+
+            // Ghi log & save
+            repository.AuditLogs.Add(new AuditLog(
+                currentUser.Username,
+                "CALCULATE_COSTS_EXPORT",
+                "SYSTEM",
+                "",
+                $"Tính toán chi phí (hiển thị {dishesWithIngredients.Count}, không có NL {dishesWithoutIngredients.Count}), xuất option: {option}"
+            ));
+            SaveAllData();
+
+            Console.WriteLine("\nNhấn phím bất kỳ để quay lại menu...");
+            Console.ReadKey();
         }
-
-        if (option == 2 || option == 3)
-        {
-            string summaryPath = Path.Combine(downloadsPath, $"DishSummary_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-            WriteSummaryCsv(summaryPath);
-            EnhancedUI.DisplaySuccess($"✅ Đã xuất file tổng hợp: {summaryPath}");
-        }
-
-        if (option == 0)
-        {
-            Console.WriteLine("Không xuất file.");
-        }
-    }
-    catch (Exception ex)
-    {
-        EnhancedUI.DisplayError("❌ Lỗi khi xuất file: " + ex.Message);
-    }
-
-    // Ghi log & save
-    repository.AuditLogs.Add(new AuditLog(
-        currentUser.Username,
-        "CALCULATE_COSTS_EXPORT",
-        "SYSTEM",
-        "",
-        $"Tính toán chi phí (hiển thị {dishesWithIngredients.Count}, không có NL {dishesWithoutIngredients.Count}), xuất option: {option}"
-    ));
-    SaveAllData();
-
-    Console.WriteLine("\nNhấn phím bất kỳ để quay lại menu...");
-    Console.ReadKey();
-}
 
 
 
@@ -3902,57 +3902,57 @@ namespace RestaurantManagementSystem
         }
 
         private void OptimizeData()
-{
-    EnhancedUI.DisplayHeader("TỐI ƯU HÓA DỮ LIỆU");
-
-    try
-    {
-        Console.WriteLine("Đang phân tích dữ liệu...");
-        Thread.Sleep(1000);
-
-        string performanceStats = memoryManager.GetPerformanceStats();
-        Console.WriteLine(performanceStats);
-
-        Console.WriteLine("\nTùy chọn tối ưu hóa:");
-        Console.WriteLine("1. Tối ưu datasets lớn");
-        Console.WriteLine("2. Nén dữ liệu");
-        Console.WriteLine("3. Dọn dẹp toàn bộ");
-        Console.Write("Chọn: ");
-
-        string choice = Console.ReadLine();
-        switch (choice)
         {
-            case "1":
-                memoryManager.OptimizeLargeDatasets();
-                EnhancedUI.DisplaySuccess("Đã tối ưu hóa datasets lớn!");
-                break;
-            case "2":
-                memoryManager.CompactData();
-                EnhancedUI.DisplaySuccess("Đã nén dữ liệu!");
-                break;
-            case "3":
-                memoryManager.OptimizeLargeDatasets();
-                memoryManager.CompactData();
-                memoryManager.Cleanup();
-                EnhancedUI.DisplaySuccess("Đã dọn dẹp và tối ưu toàn bộ hệ thống!");
-                break;
-            default:
-                EnhancedUI.DisplayError("Lựa chọn không hợp lệ!");
-                break;
+            EnhancedUI.DisplayHeader("TỐI ƯU HÓA DỮ LIỆU");
+
+            try
+            {
+                Console.WriteLine("Đang phân tích dữ liệu...");
+                Thread.Sleep(1000);
+
+                string performanceStats = memoryManager.GetPerformanceStats();
+                Console.WriteLine(performanceStats);
+
+                Console.WriteLine("\nTùy chọn tối ưu hóa:");
+                Console.WriteLine("1. Tối ưu datasets lớn");
+                Console.WriteLine("2. Nén dữ liệu");
+                Console.WriteLine("3. Dọn dẹp toàn bộ");
+                Console.Write("Chọn: ");
+
+                string choice = Console.ReadLine();
+                switch (choice)
+                {
+                    case "1":
+                        memoryManager.OptimizeLargeDatasets();
+                        EnhancedUI.DisplaySuccess("Đã tối ưu hóa datasets lớn!");
+                        break;
+                    case "2":
+                        memoryManager.CompactData();
+                        EnhancedUI.DisplaySuccess("Đã nén dữ liệu!");
+                        break;
+                    case "3":
+                        memoryManager.OptimizeLargeDatasets();
+                        memoryManager.CompactData();
+                        memoryManager.Cleanup();
+                        EnhancedUI.DisplaySuccess("Đã dọn dẹp và tối ưu toàn bộ hệ thống!");
+                        break;
+                    default:
+                        EnhancedUI.DisplayError("Lựa chọn không hợp lệ!");
+                        break;
+                }
+
+                // Hiển thị thống kê sau khi tối ưu
+                Console.WriteLine("\n" + memoryManager.GetPerformanceStats());
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Data optimization failed", "SystemSettings", ex);
+                EnhancedUI.DisplayError($"Lỗi tối ưu hóa: {ex.Message}");
+            }
+
+            Console.WriteLine("\nNhấn phím bất kỳ để tiếp tục...");
+            Console.ReadKey();
         }
-
-        // Hiển thị thống kê sau khi tối ưu
-        Console.WriteLine("\n" + memoryManager.GetPerformanceStats());
-    }
-    catch (Exception ex)
-    {
-        Logger.Error("Data optimization failed", "SystemSettings", ex);
-        EnhancedUI.DisplayError($"Lỗi tối ưu hóa: {ex.Message}");
-    }
-
-    Console.WriteLine("\nNhấn phím bất kỳ để tiếp tục...");
-    Console.ReadKey();
-}
 
         private void ShowSystemInfo()
         {
@@ -7106,88 +7106,88 @@ namespace RestaurantManagementSystem
             Console.ReadKey();
         }
 
-private void ImportDishesFromFile(string filePath)
-    {
-        try
+        private void ImportDishesFromFile(string filePath)
         {
-            int successCount = 0;
-            int errorCount = 0;
-            List<Dish> importedDishes = new List<Dish>();
-
-            using (TextFieldParser parser = new TextFieldParser(filePath))
+            try
             {
-                parser.TextFieldType = FieldType.Delimited;
-                parser.SetDelimiters(",");
-                parser.HasFieldsEnclosedInQuotes = true; // ✅ Cho phép giá trị chứa dấu phẩy trong dấu ngoặc kép
+                int successCount = 0;
+                int errorCount = 0;
+                List<Dish> importedDishes = new List<Dish>();
 
-                bool headerSkipped = false;
-
-                while (!parser.EndOfData)
+                using (TextFieldParser parser = new TextFieldParser(filePath))
                 {
-                    string[] parts = parser.ReadFields();
+                    parser.TextFieldType = FieldType.Delimited;
+                    parser.SetDelimiters(",");
+                    parser.HasFieldsEnclosedInQuotes = true; // ✅ Cho phép giá trị chứa dấu phẩy trong dấu ngoặc kép
 
-                    if (!headerSkipped)
-                    {
-                        headerSkipped = true;
-                        continue;
-                    }
+                    bool headerSkipped = false;
 
-                    try
+                    while (!parser.EndOfData)
                     {
-                        if (parts.Length >= 5)
+                        string[] parts = parser.ReadFields();
+
+                        if (!headerSkipped)
                         {
-                            string id = parts[0].Trim();
-                            string name = parts[1].Trim();
-                            string description = parts[2].Trim();
-                            decimal price = decimal.Parse(parts[3].Trim());
-                            string category = parts[4].Trim();
+                            headerSkipped = true;
+                            continue;
+                        }
 
-                            if (!repository.Dishes.ContainsKey(id))
+                        try
+                        {
+                            if (parts.Length >= 5)
                             {
-                                var dish = new Dish(id, name, description, price, category);
-                                importedDishes.Add(dish);
-                                successCount++;
+                                string id = parts[0].Trim();
+                                string name = parts[1].Trim();
+                                string description = parts[2].Trim();
+                                decimal price = decimal.Parse(parts[3].Trim());
+                                string category = parts[4].Trim();
+
+                                if (!repository.Dishes.ContainsKey(id))
+                                {
+                                    var dish = new Dish(id, name, description, price, category);
+                                    importedDishes.Add(dish);
+                                    successCount++;
+                                }
+                                else
+                                {
+                                    errorCount++;
+                                }
                             }
                             else
                             {
                                 errorCount++;
                             }
                         }
-                        else
+                        catch
                         {
                             errorCount++;
                         }
                     }
-                    catch
-                    {
-                        errorCount++;
-                    }
                 }
-            }
 
-            if (importedDishes.Any())
+                if (importedDishes.Any())
+                {
+                    var command = new BatchAddDishesCommand(this, importedDishes);
+                    undoRedoService.ExecuteCommand(command);
+
+                    repository.AuditLogs.Add(new AuditLog(currentUser.Username, "IMPORT_DISHES", "DISH", "", $"Nhập từ file: {Path.GetFileName(filePath)}"));
+                    SaveAllData();
+                }
+
+                EnhancedUI.DisplaySuccess($"Nhập dữ liệu thành công: {successCount} món");
+                if (errorCount > 0)
+                {
+                    EnhancedUI.DisplayWarning($"Có {errorCount} món bị lỗi hoặc trùng mã");
+                }
+
+                Logger.Info($"Imported {successCount} dishes from {filePath}", "DishManagement");
+            }
+            catch (Exception ex)
             {
-                var command = new BatchAddDishesCommand(this, importedDishes);
-                undoRedoService.ExecuteCommand(command);
-
-                repository.AuditLogs.Add(new AuditLog(currentUser.Username, "IMPORT_DISHES", "DISH", "", $"Nhập từ file: {Path.GetFileName(filePath)}"));
-                SaveAllData();
+                Logger.Error($"Failed to import dishes from {filePath}", "DishManagement", ex);
+                EnhancedUI.DisplayError($"Lỗi khi đọc file: {ex.Message}");
             }
-
-            EnhancedUI.DisplaySuccess($"Nhập dữ liệu thành công: {successCount} món");
-            if (errorCount > 0)
-            {
-                EnhancedUI.DisplayWarning($"Có {errorCount} món bị lỗi hoặc trùng mã");
-            }
-
-            Logger.Info($"Imported {successCount} dishes from {filePath}", "DishManagement");
         }
-        catch (Exception ex)
-        {
-            Logger.Error($"Failed to import dishes from {filePath}", "DishManagement", ex);
-            EnhancedUI.DisplayError($"Lỗi khi đọc file: {ex.Message}");
-        }
-    }
 
 
         // ==================== INGREDIENT MANAGEMENT METHODS ====================
@@ -8907,7 +8907,7 @@ private void ImportDishesFromFile(string filePath)
                 Console.ReadKey();
                 return;
             }
-             
+
             var random = new Random();
             var selectedDishes = availableDishes.OrderBy(x => random.Next()).Take(3).ToList();
 
@@ -9109,20 +9109,23 @@ private void ImportDishesFromFile(string filePath)
         }
 
         private List<Combo> GenerateCombosFromCandidates(
-     List<Dish> dishes, int minItems, int maxItems, string partyType)
+    List<Dish> dishes, int minItems, int maxItems, string partyType, int maxResults = 20) // Thêm maxResults
         {
             List<Combo> result = new List<Combo>();
-            List<string> current = new List<string>();  // Chứa ID món ăn
+            List<string> current = new List<string>();
 
             void Backtrack(int start)
             {
-                // Nếu đã chọn đủ món hợp lệ → tạo combo
+                // QUAN TRỌNG: Nếu đã tìm đủ số lượng combo cần thiết thì dừng ngay lập tức
+                if (result.Count >= maxResults) return;
+
+                // Nếu đã chọn đủ món hợp lệ
                 if (current.Count >= minItems && current.Count <= maxItems)
                 {
                     Combo combo = new Combo(
                         Guid.NewGuid().ToString(),
-                        $"{partyType} Combo ({current.Count} món)",
-                        $"Combo tự động chọn {current.Count} món cho {partyType}",
+                        $"{partyType} Combo ({current.Count} món) - #{result.Count + 1}", // Thêm số thứ tự
+                        $"Combo tự động chọn {current.Count} món",
                         10
                     );
 
@@ -9135,15 +9138,23 @@ private void ImportDishesFromFile(string filePath)
 
                 for (int i = start; i < dishes.Count; i++)
                 {
+                    // Kiểm tra lại lần nữa trong vòng lặp để thoát nhanh hơn
+                    if (result.Count >= maxResults) break;
+
                     current.Add(dishes[i].Id);
                     Backtrack(i + 1);
                     current.RemoveAt(current.Count - 1);
                 }
             }
 
+            // Mẹo nhỏ: Xáo trộn danh sách món ăn trước khi chạy để combo đa dạng hơn
+            // thay vì lúc nào cũng lấy các món đầu danh sách
+            var shuffledDishes = dishes.OrderBy(x => Guid.NewGuid()).ToList();
+
             Backtrack(0);
             return result;
         }
+
 
 
         private void GeneratePartyMenuCombos()
@@ -9174,15 +9185,18 @@ private void ImportDishesFromFile(string filePath)
 
             // Lấy toàn bộ món có thể dùng
             List<Dish> candidateDishes = repository.Dishes.Values
-                .Where(d => d.IsAvailable && CheckDishIngredients(d))
-                .ToList();
+    .Where(d => d.IsAvailable && CheckDishIngredients(d))
+    .ToList();
 
+            Console.WriteLine($"\nĐang tìm kiếm combo từ {candidateDishes.Count} món ăn khả dụng..."); // Thông báo cho user biết
+
+            // GỌI HÀM VỚI GIỚI HẠN (ví dụ: lấy tối đa 50 combo)
             var combos = GenerateCombosFromCandidates(
-                candidateDishes, minItems, maxItems, partyType);
+                candidateDishes, minItems, maxItems, partyType, 50);
 
             if (!combos.Any())
             {
-                EnhancedUI.DisplayError("Không sinh được combo!");
+                EnhancedUI.DisplayError("Không sinh được combo nào (kiểm tra lại số lượng món ăn khả dụng)!");
                 return;
             }
 
@@ -9219,6 +9233,7 @@ private void ImportDishesFromFile(string filePath)
         }
 
 
+
         private List<Combo> GenerateWeddingCombos()
         {
             var candidateDishes = repository.Dishes.Values
@@ -9230,6 +9245,7 @@ private void ImportDishesFromFile(string filePath)
 
             return GenerateCombosFromCandidates(candidateDishes, 3, 5, "Tiệc cưới");
         }
+
 
 
         private List<Combo> GenerateBirthdayCombos()
@@ -9245,6 +9261,7 @@ private void ImportDishesFromFile(string filePath)
         }
 
 
+
         private List<Combo> GenerateCorporateCombos()
         {
             var candidateDishes = repository.Dishes.Values
@@ -9258,6 +9275,7 @@ private void ImportDishesFromFile(string filePath)
         }
 
 
+
         private List<Combo> GenerateFamilyCombos()
         {
             var candidateDishes = repository.Dishes.Values
@@ -9269,6 +9287,7 @@ private void ImportDishesFromFile(string filePath)
 
             return GenerateCombosFromCandidates(candidateDishes, 2, 4, "Gia đình");
         }
+
 
 
 
@@ -10234,7 +10253,8 @@ private void ImportDishesFromFile(string filePath)
 
             var categoryGroups = repository.Dishes.Values
                 .GroupBy(d => d.Category)
-                .Select(g => new {
+                .Select(g => new
+                {
                     Category = g.Key,
                     Count = g.Count(),
                     TotalSales = g.Sum(d => d.SalesCount),
